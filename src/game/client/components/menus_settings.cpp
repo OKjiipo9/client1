@@ -3226,6 +3226,20 @@ void CMenus::RenderSettingsSystem(CUIRect MainView)
 			Slider.VSplitLeft(120.0f, nullptr, &Slider);
 			pVisuals->m_PredictionDistance = (int)(Ui()->DoScrollbarH(&pVisuals->m_PredictionDistance, &Slider, (pVisuals->m_PredictionDistance - 1) / 14.0f) * 14.0f) + 1;
 			pVisuals->m_PredictionDistance = std::clamp(pVisuals->m_PredictionDistance, 1, 15);
+
+			MainView.HSplitTop(18.0f, &Slider, &MainView);
+			s_SystemScrollRegion.AddRect(Slider);
+			str_format(aBuf, sizeof(aBuf), "Thickness: %d", pVisuals->m_PredictionThickness);
+			Ui()->DoLabel(&Slider, aBuf, 12.0f, TEXTALIGN_ML);
+			Slider.VSplitLeft(120.0f, nullptr, &Slider);
+			pVisuals->m_PredictionThickness = (int)(Ui()->DoScrollbarH(&pVisuals->m_PredictionThickness, &Slider, (pVisuals->m_PredictionThickness - 1) / 4.0f) * 4.0f) + 1;
+			pVisuals->m_PredictionThickness = std::clamp(pVisuals->m_PredictionThickness, 1, 5);
+
+			CUIRect ColorPickerLine;
+			MainView.HSplitTop(27.0f, &ColorPickerLine, &MainView);
+			s_SystemScrollRegion.AddRect(ColorPickerLine);
+			static CButtonContainer s_PredictionColorResetId;
+			DoLine_ColorPicker(&s_PredictionColorResetId, 25.0f, 13.0f, 2.0f, &ColorPickerLine, "Prediction Color", &pVisuals->m_PredictionColor, ColorRGBA(0.25f, 1.0f, 0.75f, 1.0f), false, nullptr, true);
 		}
 
 		MainView.HSplitTop(4.0f, nullptr, &MainView);
