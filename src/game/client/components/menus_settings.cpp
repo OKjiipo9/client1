@@ -3603,21 +3603,22 @@ void CMenus::RenderSettingsSystem(CUIRect MainView)
 			s_SystemScrollRegion.AddRect(Label);
 			Ui()->DoLabel(&Label, "Preset:", 11.0f, TEXTALIGN_ML);
 
-			static const char *s_apVersionPresets[] = {"Off", "TClient", "Cactus", "DDNet vanilla", "Custom"};
+			static const char *s_apVersionPresets[] = {"Off", "TClient 1.5", "Cactus 0.7.5", "DDNet 18.9", "Custom"};
 			CUIRect PresetDropDown;
 			MainView.HSplitTop(22.0f, &PresetDropDown, &MainView);
 			s_SystemScrollRegion.AddRect(PresetDropDown);
 			static CUi::SDropDownState s_VersionPresetDropState;
 			s_VersionPresetDropState.m_SelectionPopupContext.m_pScrollRegion = &s_SystemScrollRegion;
+			static int s_LastVersionPreset = -1;
 			g_Config.m_SysVersionSpoofPreset = Ui()->DoDropDown(&PresetDropDown, g_Config.m_SysVersionSpoofPreset, s_apVersionPresets, std::size(s_apVersionPresets), s_VersionPresetDropState);
 
-			// Show the actual spoofed string for current selection
-			const char *apPresetValues[] = {"", "TClient 1.5", "Cactus 0.7.5", "DDNet 18.9", ""};
-			if(g_Config.m_SysVersionSpoofPreset != 4)
+			// Apply preset value only when the selection changes (not every frame)
+			static const char *s_apPresetValues[] = {"", "TClient 1.5", "Cactus 0.7.5", "DDNet 18.9", ""};
+			if(g_Config.m_SysVersionSpoofPreset != 4 && g_Config.m_SysVersionSpoofPreset != s_LastVersionPreset)
 			{
-				// Apply preset value to the string field so it's visible
-				str_copy(g_Config.m_SysVersionSpoofStr, apPresetValues[g_Config.m_SysVersionSpoofPreset], sizeof(g_Config.m_SysVersionSpoofStr));
+				str_copy(g_Config.m_SysVersionSpoofStr, s_apPresetValues[g_Config.m_SysVersionSpoofPreset], sizeof(g_Config.m_SysVersionSpoofStr));
 			}
+			s_LastVersionPreset = g_Config.m_SysVersionSpoofPreset;
 
 			// Custom string field (only editable in Custom mode)
 			MainView.HSplitTop(6.0f, nullptr, &MainView);

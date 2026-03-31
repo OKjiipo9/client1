@@ -1369,7 +1369,7 @@ void CChat::SendChat(int Team, const char *pLine)
 	{
 		CMsgPacker MsgDummy(NETMSGTYPE_CL_SAY, false);
 		MsgDummy.AddInt(Team);
-		MsgDummy.AddString(pLine, 256);
+		MsgDummy.AddString(pLine, MAX_LINE_LENGTH);
 		Client()->SendMsg(!g_Config.m_ClDummy, &MsgDummy, MSGFLAG_VITAL);
 	}
 }
