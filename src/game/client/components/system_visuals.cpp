@@ -15,6 +15,7 @@
 #include <game/gamecore.h>
 
 #include <algorithm>
+#include <cmath>
 #include <vector>
 
 void CSystemVisuals::InitDefaultHudPositions()
@@ -69,6 +70,7 @@ void CSystemVisuals::OnUpdate()
 		ApplyRainbowColors();
 
 	HandleHudDragging();
+	HandleDummySwapBind();
 }
 
 void CSystemVisuals::OnWindowResize()
@@ -126,25 +128,33 @@ void CSystemVisuals::ApplyRainbowColors()
 	if(!pLocalClient || !pLocalClient->m_Active)
 		return;
 
-	m_RainbowHue += 0.001f;
-	if(m_RainbowHue >= 1.0f)
-		m_RainbowHue = 0.0f;
+	// Use time-based sinusoidal animation for smooth, visually pleasing color transitions.
+	// Body and feet cycle at slightly different rates so they create an organic shimmer on skins.
+	float Time = Client()->LocalTime();
+	float BodyHue = std::fmod(Time * 0.12f, 1.0f);
+	float FeetHue = std::fmod(Time * 0.12f + 0.33f, 1.0f); // offset by 1/3 for contrast
 
-	ColorHSLA RainbowHSL(m_RainbowHue, 1.0f, 0.5f, 1.0f);
-	ColorRGBA RainbowRGB = color_cast<ColorRGBA>(RainbowHSL);
+	// Sinusoidal saturation/lightness keeps colors vivid even on custom skin textures.
+	float Sat = 0.80f + 0.20f * std::sin(Time * 1.8f);
+	float BodyLit = 0.52f + 0.10f * std::sin(Time * 2.3f);
+	float FeetLit = 0.52f + 0.10f * std::sin(Time * 2.3f + 1.0f);
+
+	ColorHSLA BodyHSL(BodyHue, Sat, BodyLit, 1.0f);
+	ColorHSLA FeetHSL(FeetHue, Sat, FeetLit, 1.0f);
+	ColorRGBA BodyRGB = color_cast<ColorRGBA>(BodyHSL);
+	ColorRGBA FeetRGB = color_cast<ColorRGBA>(FeetHSL);
 
 	CTeeRenderInfo *pRenderInfo = &pLocalClient->m_RenderInfo;
-	pRenderInfo->m_ColorBody = RainbowRGB;
-	pRenderInfo->m_ColorFeet = RainbowRGB;
+	pRenderInfo->m_ColorBody = BodyRGB;
+	pRenderInfo->m_ColorFeet = FeetRGB;
 
-	int r = (int)(RainbowRGB.r * 255.0f);
-	int g = (int)(RainbowRGB.g * 255.0f);
-	int b = (int)(RainbowRGB.b * 255.0f);
-	int PackedColor = (r << 16) | (g << 8) | b;
+	auto PackRGB = [](const ColorRGBA &c) -> int {
+		return ((int)(c.r * 255.0f) << 16) | ((int)(c.g * 255.0f) << 8) | (int)(c.b * 255.0f);
+	};
 
 	pLocalClient->m_UseCustomColor = 1;
-	pLocalClient->m_ColorBody = PackedColor;
-	pLocalClient->m_ColorFeet = PackedColor;
+	pLocalClient->m_ColorBody = PackRGB(BodyRGB);
+	pLocalClient->m_ColorFeet = PackRGB(FeetRGB);
 }
 
 bool CSystemVisuals::MouseInsideRect(const vec2 &MousePos, const vec2 &RectPos, float RectW, float RectH) const
@@ -191,6 +201,35 @@ void CSystemVisuals::HandleHudDragging()
 	m_LastLayoutMouseButton1 = false;
 }
 
+void CSystemVisuals::HandleDummySwapBind()
+{
+	const char *pBind = g_Config.m_SysDummySwapBind;
+	if(!pBind || !pBind[0])
+		return;
+
+	// Resolve key name to key code
+	int Key = KEY_UNKNOWN;
+	for(int k = KEY_FIRST; k < KEY_LAST; k++)
+	{
+		if(str_comp_nocase(Input()->KeyName(k), pBind) == 0)
+		{
+			Key = k;
+			break;
+		}
+	}
+	if(Key == KEY_UNKNOWN)
+		return;
+
+	bool Pressed = Input()->KeyIsPressed(Key);
+	// Toggle on rising edge (key-down)
+	if(Pressed && !m_DummySwapBindPrev)
+	{
+		if(Client()->DummyConnected())
+			g_Config.m_ClDummy ^= 1;
+	}
+	m_DummySwapBindPrev = Pressed;
+}
+
 void CSystemVisuals::RenderWaterMark()
 {
 	const float Width = 250.0f;
@@ -203,26 +242,30 @@ void CSystemVisuals::RenderWaterMark()
 	float y = m_WaterMarkPos.y;
 
 	float Time = Client()->LocalTime();
-	float Hue = fmod(Time * 0.1f, 1.0f);
+	// Sinusoidal purple accent that subtly breathes over time
+	float PulseA = 0.55f + 0.15f * std::sin(Time * 1.4f);
+	float PulseB = 0.35f + 0.10f * std::sin(Time * 1.1f + 0.9f);
 
-	ColorHSLA GlowHSL(Hue, 0.55f, 0.67f, 1.0f);
-	ColorRGBA GlowRGBA = color_cast<ColorRGBA>(GlowHSL);
-	ColorRGBA BorderRGBA(GlowRGBA.r, GlowRGBA.g, GlowRGBA.b, 0.42f);
-	ColorRGBA BgRGBA(0.07f, 0.09f, 0.13f, 0.54f);
-	ColorRGBA ShineRGBA(0.95f, 0.98f, 1.0f, 0.12f);
-	ColorRGBA AccentRGBA(GlowRGBA.r, GlowRGBA.g, GlowRGBA.b, 0.26f);
+	// Dark purple palette
+	ColorRGBA BgRGBA(0.07f, 0.03f, 0.14f, 0.82f);
+	ColorRGBA BorderRGBA(0.52f, 0.18f, 0.88f, PulseA);
+	ColorRGBA GlowRGBA(0.45f, 0.12f, 0.78f, 0.18f);
+	ColorRGBA AccentRGBA(0.32f, 0.08f, 0.60f, PulseB);
+	ColorRGBA ShineRGBA(0.75f, 0.55f, 1.00f, 0.10f);
+
 	const char *pTitle = "system client";
-	const char *pEdition = "Liquid Glass";
+	const char *pEdition = "Dark Violet";
 
-	// Outer frame
+	// Outer glow
 	Graphics()->TextureClear();
 	Graphics()->QuadsBegin();
-	Graphics()->SetColor(BorderRGBA.r, BorderRGBA.g, BorderRGBA.b, BorderRGBA.a * 0.85f);
-	IGraphics::CQuadItem QuadBorder(x - 1.5f, y - 1.5f, Width + 3.0f, Height + 3.0f);
-	Graphics()->QuadsDrawTL(&QuadBorder, 1);
-	Graphics()->SetColor(GlowRGBA.r, GlowRGBA.g, GlowRGBA.b, 0.12f);
+	Graphics()->SetColor(GlowRGBA.r, GlowRGBA.g, GlowRGBA.b, GlowRGBA.a);
 	IGraphics::CQuadItem QuadGlow(x - 6.0f, y - 6.0f, Width + 12.0f, Height + 12.0f);
 	Graphics()->QuadsDrawTL(&QuadGlow, 1);
+	// Border frame
+	Graphics()->SetColor(BorderRGBA.r, BorderRGBA.g, BorderRGBA.b, BorderRGBA.a * 0.90f);
+	IGraphics::CQuadItem QuadBorder(x - 1.5f, y - 1.5f, Width + 3.0f, Height + 3.0f);
+	Graphics()->QuadsDrawTL(&QuadBorder, 1);
 	Graphics()->QuadsEnd();
 
 	// Background
@@ -231,37 +274,33 @@ void CSystemVisuals::RenderWaterMark()
 	Graphics()->SetColor(BgRGBA.r, BgRGBA.g, BgRGBA.b, BgRGBA.a);
 	IGraphics::CQuadItem QuadBg(x, y, Width, Height);
 	Graphics()->QuadsDrawTL(&QuadBg, 1);
+	// Bottom-half purple tint
 	Graphics()->SetColor(AccentRGBA.r, AccentRGBA.g, AccentRGBA.b, AccentRGBA.a);
 	IGraphics::CQuadItem QuadAccent(x, y + Height * 0.46f, Width, Height * 0.54f);
 	Graphics()->QuadsDrawTL(&QuadAccent, 1);
 	Graphics()->QuadsEnd();
 
-	// Soft top highlight
+	// Top shine + bottom separator
 	Graphics()->TextureClear();
 	Graphics()->QuadsBegin();
 	Graphics()->SetColor(ShineRGBA.r, ShineRGBA.g, ShineRGBA.b, ShineRGBA.a);
-	IGraphics::CQuadItem QuadGradient(x, y, Width, Height * 0.45f);
-	Graphics()->QuadsDrawTL(&QuadGradient, 1);
-	Graphics()->SetColor(1.0f, 1.0f, 1.0f, 0.08f);
-	IGraphics::CQuadItem QuadShineBand(x + 8.0f, y + 9.0f, Width - 16.0f, 10.0f);
-	Graphics()->QuadsDrawTL(&QuadShineBand, 1);
-	Graphics()->SetColor(BorderRGBA.r, BorderRGBA.g, BorderRGBA.b, 0.22f);
+	IGraphics::CQuadItem QuadShine(x + 8.0f, y + 7.0f, Width - 16.0f, 9.0f);
+	Graphics()->QuadsDrawTL(&QuadShine, 1);
+	Graphics()->SetColor(BorderRGBA.r, BorderRGBA.g, BorderRGBA.b, 0.30f);
 	IGraphics::CQuadItem QuadLine(x + 10.0f, y + Height - 5.0f, Width - 20.0f, 1.5f);
 	Graphics()->QuadsDrawTL(&QuadLine, 1);
 	Graphics()->QuadsEnd();
 
 	// Title
-	float TextX = x + 12.0f;
-	float TextY = y + 11.0f;
+	TextRender()->TextColor(0.92f, 0.82f, 1.0f, 1.0f);
+	TextRender()->Text(x + 12.0f, y + 11.0f, 18.0f, pTitle);
 
-	TextRender()->TextColor(0.96f, 0.98f, 1.0f, 1.0f);
-	TextRender()->Text(TextX, TextY, 18.0f, pTitle);
-
-	// Edition / active label
-	TextRender()->TextColor(0.75f, 0.82f, 0.9f, 1.0f);
+	// Edition label
+	TextRender()->TextColor(0.65f, 0.45f, 0.90f, 1.0f);
 	TextRender()->Text(x + 12.0f, y + 34.0f, 10.0f, pEdition);
 
-	TextRender()->TextColor(GlowRGBA.r, GlowRGBA.g, GlowRGBA.b, 0.96f);
+	// Status
+	TextRender()->TextColor(BorderRGBA.r, BorderRGBA.g, BorderRGBA.b, 0.98f);
 	TextRender()->Text(x + 12.0f, y + 50.0f, 11.0f, "ACTIVE");
 
 	TextRender()->TextColor(1.0f, 1.0f, 1.0f, 1.0f);
@@ -290,15 +329,15 @@ void CSystemVisuals::RenderFunctionList()
 	float y = m_FunctionListPos.y;
 
 	float Time = Client()->LocalTime();
-	float Hue = fmod(Time * 0.11f + 0.18f, 1.0f);
-	ColorHSLA GlowHSL(Hue, 0.52f, 0.66f, 1.0f);
-	ColorRGBA GlowRGBA = color_cast<ColorRGBA>(GlowHSL);
-	ColorRGBA BorderRGBA(GlowRGBA.r, GlowRGBA.g, GlowRGBA.b, 0.40f);
-	ColorRGBA LineRGBA(GlowRGBA.r, GlowRGBA.g, GlowRGBA.b, 0.28f);
-	ColorRGBA TitleBaseRGBA(0.95f, 0.98f, 1.0f, 1.0f);
-	ColorRGBA ItemBaseRGBA(0.87f, 0.93f, 0.99f, 1.0f);
+	// Dark purple base palette (non-rainbow path)
+	float PurplePulse = 0.45f + 0.12f * std::sin(Time * 1.6f);
+	ColorRGBA BorderRGBA(0.52f, 0.18f, 0.88f, PurplePulse);
+	ColorRGBA LineRGBA(0.42f, 0.14f, 0.72f, 0.35f);
+	ColorRGBA TitleBaseRGBA(0.90f, 0.78f, 1.0f, 1.0f);
+	ColorRGBA ItemBaseRGBA(0.75f, 0.60f, 0.95f, 1.0f);
 
-	// Rainbow override
+	// Rainbow override — keep full spectrum when enabled
+	float Hue = std::fmod(Time * 0.11f + 0.18f, 1.0f);
 	if(m_FunctionListRainbow)
 	{
 		ColorHSLA BorderColor(Hue, 0.92f, 0.65f, 1.0f);
@@ -320,10 +359,11 @@ void CSystemVisuals::RenderFunctionList()
 	// Background
 	Graphics()->TextureClear();
 	Graphics()->QuadsBegin();
-	Graphics()->SetColor(0.07f, 0.09f, 0.13f, 0.52f);
+	Graphics()->SetColor(0.07f, 0.03f, 0.14f, 0.82f);
 	IGraphics::CQuadItem Quad(x, y, Width, Height);
 	Graphics()->QuadsDrawTL(&Quad, 1);
-	Graphics()->SetColor(GlowRGBA.r, GlowRGBA.g, GlowRGBA.b, 0.16f);
+	// Purple bottom tint
+	Graphics()->SetColor(0.32f, 0.08f, 0.58f, 0.22f);
 	IGraphics::CQuadItem QuadBottomTint(x, y + Height * 0.50f, Width, Height * 0.50f);
 	Graphics()->QuadsDrawTL(&QuadBottomTint, 1);
 	Graphics()->QuadsEnd();
@@ -418,14 +458,12 @@ void CSystemVisuals::RenderSpeedTab()
 	float y = m_SpeedTabPos.y;
 
 	float Time = Client()->LocalTime();
-	float Hue = fmod(Time * 0.11f + 0.28f, 1.0f);
-	ColorHSLA GlowHSL(Hue, 0.52f, 0.67f, 1.0f);
-	ColorRGBA GlowRGBA = color_cast<ColorRGBA>(GlowHSL);
-	ColorRGBA BorderRGBA(GlowRGBA.r, GlowRGBA.g, GlowRGBA.b, 0.42f);
-	ColorRGBA BgRGBA(0.07f, 0.09f, 0.13f, 0.53f);
-	ColorRGBA TitleRGBA(0.95f, 0.98f, 1.0f, 1.0f);
-	ColorRGBA ValueRGBA(1.0f, 1.0f, 1.0f, 1.0f);
-	ColorRGBA MaxRGBA(0.78f, 0.86f, 0.95f, 1.0f);
+	float PurplePulse = 0.50f + 0.12f * std::sin(Time * 1.3f);
+	ColorRGBA BorderRGBA(0.52f, 0.18f, 0.88f, PurplePulse);
+	ColorRGBA BgRGBA(0.07f, 0.03f, 0.14f, 0.82f);
+	ColorRGBA TitleRGBA(0.90f, 0.78f, 1.0f, 1.0f);
+	ColorRGBA ValueRGBA(0.96f, 0.90f, 1.0f, 1.0f);
+	ColorRGBA MaxRGBA(0.65f, 0.45f, 0.90f, 1.0f);
 
 	// Border outline
 	Graphics()->TextureClear();
@@ -441,17 +479,18 @@ void CSystemVisuals::RenderSpeedTab()
 	Graphics()->SetColor(BgRGBA.r, BgRGBA.g, BgRGBA.b, BgRGBA.a);
 	IGraphics::CQuadItem Quad(x, y, Width, Height);
 	Graphics()->QuadsDrawTL(&Quad, 1);
-	Graphics()->SetColor(GlowRGBA.r, GlowRGBA.g, GlowRGBA.b, 0.17f);
+	// Purple bottom tint
+	Graphics()->SetColor(0.32f, 0.08f, 0.58f, 0.22f);
 	IGraphics::CQuadItem QuadBottomTint(x, y + Height * 0.50f, Width, Height * 0.50f);
 	Graphics()->QuadsDrawTL(&QuadBottomTint, 1);
 	Graphics()->QuadsEnd();
 
 	Graphics()->TextureClear();
 	Graphics()->QuadsBegin();
-	Graphics()->SetColor(1.0f, 1.0f, 1.0f, 0.11f);
+	Graphics()->SetColor(0.75f, 0.55f, 1.0f, 0.10f);
 	IGraphics::CQuadItem QuadShine(x + 8.0f, y + 8.0f, Width - 16.0f, 9.0f);
 	Graphics()->QuadsDrawTL(&QuadShine, 1);
-	Graphics()->SetColor(BorderRGBA.r, BorderRGBA.g, BorderRGBA.b, 0.16f);
+	Graphics()->SetColor(BorderRGBA.r, BorderRGBA.g, BorderRGBA.b, 0.22f);
 	IGraphics::CQuadItem QuadSoftLine(x + 8.0f, y + Height - 7.0f, Width - 16.0f, 1.0f);
 	Graphics()->QuadsDrawTL(&QuadSoftLine, 1);
 	Graphics()->QuadsEnd();

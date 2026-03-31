@@ -19,7 +19,7 @@ public:
 	bool m_GhostAccessoryEnabled = false;
 
 	// Shared HUD theme for WaterMark / FunctionList / SpeedTab
-	// 0 = Glass, 1 = Minimal, 2 = Neon
+	// 0 = Dark Violet (default), 1 = Minimal, 2 = Neon
 	// 3 = Aurora, 4 = Cyber, 5 = Sunset, 6 = Midnight, 7 = Pastel
 	int m_HudThemeStyle = 0;
 	bool m_HudLayoutMode = false;
@@ -45,6 +45,7 @@ private:
 	void RenderGhostAccessory();
 	void ApplyRainbowColors();
 	void HandleHudDragging();
+	void HandleDummySwapBind();
 	void InitDefaultHudPositions();
 	bool MouseInsideRect(const vec2 &MousePos, const vec2 &RectPos, float RectW, float RectH) const;
 	void ClampHudPositions(float ScreenW, float ScreenH, float FunctionListH);
@@ -71,8 +72,9 @@ private:
 	vec2 m_LayoutMousePos = vec2(0.0f, 0.0f);
 	bool m_LastLayoutMouseButton1 = false;
 
-	float m_RainbowHue = 0.0f;
 	float m_MaxSpeed = 0.0f;
+	// Dummy swap bind: track previous key state to detect edges
+	bool m_DummySwapBindPrev = false;
 };
 
 #endif

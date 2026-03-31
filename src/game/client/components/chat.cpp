@@ -1363,6 +1363,15 @@ void CChat::SendChat(int Team, const char *pLine)
 	Msg.m_Team = Team;
 	Msg.m_pMessage = pLine;
 	Client()->SendPackMsgActive(&Msg, MSGFLAG_VITAL);
+
+	// Mirror chat to dummy when option is enabled
+	if(g_Config.m_SysDummyCopyChat && Client()->DummyConnected())
+	{
+		CMsgPacker MsgDummy(NETMSGTYPE_CL_SAY, false);
+		MsgDummy.AddInt(Team);
+		MsgDummy.AddString(pLine, 256);
+		Client()->SendMsg(!g_Config.m_ClDummy, &MsgDummy, MSGFLAG_VITAL);
+	}
 }
 
 void CChat::SendChatQueued(const char *pLine)

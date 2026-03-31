@@ -3384,7 +3384,7 @@ void CMenus::RenderSettingsSystem(CUIRect MainView)
 	{
 		MainView.HSplitTop(22.0f, &Label, &MainView);
 		s_SystemScrollRegion.AddRect(Label);
-		Ui()->DoLabel(&Label, "Dummy", 16.0f, TEXTALIGN_ML);
+		Ui()->DoLabel(&Label, "Dummy Manager", 16.0f, TEXTALIGN_ML);
 
 		MainView.HSplitTop(6.0f, nullptr, &MainView);
 
@@ -3467,6 +3467,71 @@ void CMenus::RenderSettingsSystem(CUIRect MainView)
 				g_Config.m_ClDummy ^= 1;
 		}
 
+		// Swap keybind
+		MainView.HSplitTop(10.0f, nullptr, &MainView);
+		MainView.HSplitTop(18.0f, &Label, &MainView);
+		s_SystemScrollRegion.AddRect(Label);
+		Ui()->DoLabel(&Label, "Swap keybind (toggles Main ↔ Dummy)", 12.0f, TEXTALIGN_ML);
+
+		MainView.HSplitTop(4.0f, nullptr, &MainView);
+		{
+			CUIRect BindRow, BindLabel, BindButton;
+			MainView.HSplitTop(24.0f, &BindRow, &MainView);
+			s_SystemScrollRegion.AddRect(BindRow);
+			BindRow.VSplitLeft(80.0f, &BindLabel, &BindButton);
+			Ui()->DoLabel(&BindLabel, "Swap key:", 11.0f, TEXTALIGN_ML);
+
+			static CButtonContainer s_DummySwapBindButton;
+			static bool s_WaitingDummySwapBind = false;
+			char aSwapBindText[32];
+			if(s_WaitingDummySwapBind)
+				str_copy(aSwapBindText, "Press key...", sizeof(aSwapBindText));
+			else if(g_Config.m_SysDummySwapBind[0])
+				str_copy(aSwapBindText, g_Config.m_SysDummySwapBind, sizeof(aSwapBindText));
+			else
+				str_copy(aSwapBindText, "[None]", sizeof(aSwapBindText));
+
+			if(DoButton_Menu(&s_DummySwapBindButton, aSwapBindText, 0, &BindButton))
+				s_WaitingDummySwapBind = true;
+
+			if(s_WaitingDummySwapBind)
+			{
+				for(int Key = KEY_FIRST; Key < KEY_LAST; Key++)
+				{
+					if(!Input()->KeyPress(Key))
+						continue;
+					const char *pKeyName = Input()->KeyName(Key);
+					if(pKeyName && pKeyName[0])
+						str_copy(g_Config.m_SysDummySwapBind, pKeyName, sizeof(g_Config.m_SysDummySwapBind));
+					s_WaitingDummySwapBind = false;
+					break;
+				}
+			}
+		}
+
+		// Mirroring options
+		MainView.HSplitTop(10.0f, nullptr, &MainView);
+		MainView.HSplitTop(18.0f, &Label, &MainView);
+		s_SystemScrollRegion.AddRect(Label);
+		Ui()->DoLabel(&Label, "Mirror options (copies actions to dummy)", 12.0f, TEXTALIGN_ML);
+
+		MainView.HSplitTop(4.0f, nullptr, &MainView);
+		{
+			CUIRect Row, LeftCol, RightCol;
+			MainView.HSplitTop(20.0f, &Row, &MainView);
+			s_SystemScrollRegion.AddRect(Row);
+			Row.VSplitMid(&LeftCol, &RightCol, 8.0f);
+			if(DoButton_CheckBox(&g_Config.m_ClDummyCopyMoves, "Copy Movement", g_Config.m_ClDummyCopyMoves, &LeftCol))
+				g_Config.m_ClDummyCopyMoves ^= 1;
+			if(DoButton_CheckBox(&g_Config.m_SysDummyCopyEmotes, "Copy Emotes", g_Config.m_SysDummyCopyEmotes, &RightCol))
+				g_Config.m_SysDummyCopyEmotes ^= 1;
+
+			MainView.HSplitTop(20.0f, &Row, &MainView);
+			s_SystemScrollRegion.AddRect(Row);
+			if(DoButton_CheckBox(&g_Config.m_SysDummyCopyChat, "Copy Chat", g_Config.m_SysDummyCopyChat, &Row))
+				g_Config.m_SysDummyCopyChat ^= 1;
+		}
+
 		MainView.HSplitTop(10.0f, nullptr, &MainView);
 		MainView.HSplitTop(18.0f, &Label, &MainView);
 		s_SystemScrollRegion.AddRect(Label);
@@ -3517,6 +3582,60 @@ void CMenus::RenderSettingsSystem(CUIRect MainView)
 				Ui()->DoLabel(&Label, "Failed to launch extra client process.", 11.0f, TEXTALIGN_ML);
 			}
 			TextRender()->TextColor(1.0f, 1.0f, 1.0f, 1.0f);
+		}
+
+		// ---- Version Spoofer ----
+		MainView.HSplitTop(12.0f, nullptr, &MainView);
+		MainView.HSplitTop(22.0f, &Label, &MainView);
+		s_SystemScrollRegion.AddRect(Label);
+		Ui()->DoLabel(&Label, "Version Spoofer", 16.0f, TEXTALIGN_ML);
+
+		MainView.HSplitTop(4.0f, nullptr, &MainView);
+		MainView.HSplitTop(18.0f, &Button, &MainView);
+		s_SystemScrollRegion.AddRect(Button);
+		if(DoButton_CheckBox(&g_Config.m_SysVersionSpoofEnabled, "Enable version spoof", g_Config.m_SysVersionSpoofEnabled, &Button))
+			g_Config.m_SysVersionSpoofEnabled ^= 1;
+
+		if(g_Config.m_SysVersionSpoofEnabled)
+		{
+			MainView.HSplitTop(6.0f, nullptr, &MainView);
+			MainView.HSplitTop(18.0f, &Label, &MainView);
+			s_SystemScrollRegion.AddRect(Label);
+			Ui()->DoLabel(&Label, "Preset:", 11.0f, TEXTALIGN_ML);
+
+			static const char *s_apVersionPresets[] = {"Off", "TClient", "Cactus", "DDNet vanilla", "Custom"};
+			CUIRect PresetDropDown;
+			MainView.HSplitTop(22.0f, &PresetDropDown, &MainView);
+			s_SystemScrollRegion.AddRect(PresetDropDown);
+			static CUi::SDropDownState s_VersionPresetDropState;
+			s_VersionPresetDropState.m_SelectionPopupContext.m_pScrollRegion = &s_SystemScrollRegion;
+			g_Config.m_SysVersionSpoofPreset = Ui()->DoDropDown(&PresetDropDown, g_Config.m_SysVersionSpoofPreset, s_apVersionPresets, std::size(s_apVersionPresets), s_VersionPresetDropState);
+
+			// Show the actual spoofed string for current selection
+			const char *apPresetValues[] = {"", "TClient 1.5", "Cactus 0.7.5", "DDNet 18.9", ""};
+			if(g_Config.m_SysVersionSpoofPreset != 4)
+			{
+				// Apply preset value to the string field so it's visible
+				str_copy(g_Config.m_SysVersionSpoofStr, apPresetValues[g_Config.m_SysVersionSpoofPreset], sizeof(g_Config.m_SysVersionSpoofStr));
+			}
+
+			// Custom string field (only editable in Custom mode)
+			MainView.HSplitTop(6.0f, nullptr, &MainView);
+			MainView.HSplitTop(18.0f, &Label, &MainView);
+			s_SystemScrollRegion.AddRect(Label);
+			Ui()->DoLabel(&Label, "Version string:", 11.0f, TEXTALIGN_ML);
+
+			MainView.HSplitTop(4.0f, nullptr, &MainView);
+			MainView.HSplitTop(24.0f, &Button, &MainView);
+			s_SystemScrollRegion.AddRect(Button);
+			static CLineInput s_VersionStringInput;
+			s_VersionStringInput.SetBuffer(g_Config.m_SysVersionSpoofStr, sizeof(g_Config.m_SysVersionSpoofStr));
+			s_VersionStringInput.SetEmptyText("e.g. TClient 1.5");
+			// Read-only for presets, editable for custom
+			if(g_Config.m_SysVersionSpoofPreset == 4)
+				Ui()->DoEditBox(&s_VersionStringInput, &Button, 11.0f);
+			else
+				Ui()->DoLabel(&Button, g_Config.m_SysVersionSpoofStr[0] ? g_Config.m_SysVersionSpoofStr : "(none)", 11.0f, TEXTALIGN_ML);
 		}
 	}
 	// ============== MISC (local visuals + chat) ==============
@@ -3575,10 +3694,21 @@ void CMenus::RenderSettingsSystem(CUIRect MainView)
 		MainView.HSplitTop(20.0f, &Row, &MainView);
 		s_SystemScrollRegion.AddRect(Row);
 		Row.VSplitMid(&LeftCol, &RightCol, 8.0f);
-		if(DoButton_CheckBox(&pWibeVisuals->m_AntiAimEnabled, "Fake aim(visual)", pWibeVisuals->m_AntiAimEnabled, &LeftCol))
+		if(DoButton_CheckBox(&pWibeVisuals->m_AntiAimEnabled, "Fake Aim Visual (local only)", pWibeVisuals->m_AntiAimEnabled, &LeftCol))
 			pWibeVisuals->m_AntiAimEnabled ^= 1;
 		if(DoButton_CheckBox(&pWibeVisuals->m_NickStealerEnabled, "Nick Stealer", pWibeVisuals->m_NickStealerEnabled, &RightCol))
 			pWibeVisuals->m_NickStealerEnabled ^= 1;
+
+		// Fake Aim description
+		if(pWibeVisuals->m_AntiAimEnabled)
+		{
+			MainView.HSplitTop(4.0f, nullptr, &MainView);
+			MainView.HSplitTop(16.0f, &Label, &MainView);
+			s_SystemScrollRegion.AddRect(Label);
+			TextRender()->TextColor(0.65f, 0.45f, 0.90f, 1.0f);
+			Ui()->DoLabel(&Label, "Aim visuals shown locally only — other players are not affected.", 10.0f, TEXTALIGN_ML);
+			TextRender()->TextColor(1.0f, 1.0f, 1.0f, 1.0f);
+		}
 
 		MainView.HSplitTop(6.0f, nullptr, &MainView);
 		// Fly controls are configured in General tab, not in Misc.

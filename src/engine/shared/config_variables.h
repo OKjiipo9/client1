@@ -803,3 +803,9 @@ MACRO_CONFIG_INT(ClVideoRecorderFPS, cl_video_recorder_fps, 60, 1, 1000, CFGFLAG
  */
 MACRO_CONFIG_STR(WibeAutoPseudoBind, wibe_auto_pseudo_bind, 32, "", CFGFLAG_CLIENT | CFGFLAG_SAVE, "Auto pseudo toggle bind key")
 MACRO_CONFIG_STR(WibeAutoTripleBind, wibe_auto_triple_bind, 32, "", CFGFLAG_CLIENT | CFGFLAG_SAVE, "Auto triple hold bind key")
+MACRO_CONFIG_STR(SysDummySwapBind, sys_dummy_swap_bind, 32, "", CFGFLAG_CLIENT | CFGFLAG_SAVE, "Key to swap active control between main and dummy")
+MACRO_CONFIG_INT(SysDummyCopyChat, sys_dummy_copy_chat, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Copy chat messages to dummy")
+MACRO_CONFIG_INT(SysDummyCopyEmotes, sys_dummy_copy_emotes, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Mirror emotes from main to dummy")
+MACRO_CONFIG_INT(SysVersionSpoofEnabled, sys_version_spoof_enabled, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Enable version spoofing")
+MACRO_CONFIG_STR(SysVersionSpoofStr, sys_version_spoof_str, 64, "", CFGFLAG_CLIENT | CFGFLAG_SAVE, "Custom version string for spoof (empty = use preset)")
+MACRO_CONFIG_INT(SysVersionSpoofPreset, sys_version_spoof_preset, 0, 0, 4, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Version spoof preset (0=Off, 1=TClient, 2=Cactus, 3=DDNet, 4=Custom)")
