@@ -26,6 +26,8 @@ public:
 
 	// Prediction settings
 	int m_PredictionDistance = 5;
+	unsigned int m_PredictionColor = 0xFF71FF9F; // HSLA packed: teal (H≈160°, S=100%, L=62%, A=100%)
+	int m_PredictionThickness = 1; // 1 to 5
 
 	// Component interface
 	virtual int Sizeof() const override { return sizeof(*this); }

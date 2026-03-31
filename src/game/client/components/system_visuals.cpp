@@ -584,38 +584,46 @@ void CSystemVisuals::RenderPrediction()
 	if(TrajectoryPoints.size() < 2)
 		return;
 
-	// Convert to screen coordinates
-	vec2 CameraOffset = GameClient()->m_Camera.m_Center;
-	float ScreenWidth = Graphics()->ScreenWidth();
-	float ScreenHeight = Graphics()->ScreenHeight();
+	// Determine base color from settings
+	ColorRGBA BaseColor = color_cast<ColorRGBA>(ColorHSLA(m_PredictionColor, true));
 
-	std::vector<vec2> ScreenPoints;
-	for(const vec2 &WorldPos : TrajectoryPoints)
-	{
-		vec2 ScreenPos;
-		ScreenPos.x = (WorldPos.x - CameraOffset.x) + ScreenWidth / 2.0f;
-		ScreenPos.y = (WorldPos.y - CameraOffset.y) + ScreenHeight / 2.0f;
-		ScreenPoints.push_back(ScreenPos);
-	}
+	// Half-width in world units for thickness
+	float HalfWidth = static_cast<float>(m_PredictionThickness);
+
+	// Switch to world-space coordinates so the prediction is drawn as part of the map,
+	// not locked to the camera/HUD plane.
+	Graphics()->MapScreenToInterface(
+		GameClient()->m_Camera.m_Center.x,
+		GameClient()->m_Camera.m_Center.y,
+		GameClient()->m_Camera.m_Zoom);
 
 	Graphics()->TextureClear();
+	Graphics()->QuadsBegin();
 
-	// Simple prediction: just a clean polyline.
-	Graphics()->LinesBegin();
-	for(size_t i = 0; i < ScreenPoints.size() - 1; i++)
+	for(size_t i = 0; i < TrajectoryPoints.size() - 1; i++)
 	{
 		float Progress = Distances[i] / MaxDistance;
-		float Alpha = 1.0f - Progress * 0.35f;
-		Graphics()->SetColor(0.25f, 1.0f, 0.75f, Alpha);
+		float Alpha = BaseColor.a * (1.0f - Progress * 0.35f);
+		Graphics()->SetColor(BaseColor.r, BaseColor.g, BaseColor.b, Alpha);
 
-		IGraphics::CLineItem Line(
-			ScreenPoints[i].x,
-			ScreenPoints[i].y,
-			ScreenPoints[i + 1].x,
-			ScreenPoints[i + 1].y);
-		Graphics()->LinesDraw(&Line, 1);
+		vec2 A = TrajectoryPoints[i];
+		vec2 B = TrajectoryPoints[i + 1];
+		vec2 Dir = B - A;
+		float Len = length(Dir);
+		if(Len < 0.001f)
+			continue;
+		Dir /= Len;
+
+		// Perpendicular offset for line thickness
+		vec2 Out = vec2(Dir.y, -Dir.x) * HalfWidth;
+		IGraphics::CFreeformItem Freeform(A - Out, A + Out, B - Out, B + Out);
+		Graphics()->QuadsDrawFreeform(&Freeform, 1);
 	}
-	Graphics()->LinesEnd();
+
+	Graphics()->QuadsEnd();
+
+	// Restore screen-space coordinate system for subsequent HUD rendering
+	Graphics()->MapScreen(0, 0, Graphics()->ScreenWidth(), Graphics()->ScreenHeight());
 }
 
 void CSystemVisuals::RenderFireAss()
